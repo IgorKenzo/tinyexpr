@@ -56,7 +56,8 @@ typedef double (*te_fun2)(double, double);
 
 enum {
     TOK_NULL = TE_CLOSURE7+1, TOK_ERROR, TOK_END, TOK_SEP,
-    TOK_OPEN, TOK_CLOSE, TOK_NUMBER, TOK_VARIABLE, TOK_INFIX
+    TOK_OPEN, TOK_CLOSE, TOK_NUMBER, TOK_VARIABLE, TOK_INFIX,
+    TOK_SUFIX
 };
 
 
@@ -292,6 +293,7 @@ void next_token(state *s) {
                     case ')': s->type = TOK_CLOSE; break;
                     case ',': s->type = TOK_SEP; break;
                     case ' ': case '\t': case '\n': case '\r': break;
+                    case '!': s->type = TOK_SUFIX; s->function = fac; break;
                     default: s->type = TOK_ERROR; break;
                 }
             }
@@ -306,6 +308,8 @@ static te_expr *power(state *s);
 
 static te_expr *base(state *s) {
     /* <base>      =    <constant> | <variable> | <function-0> {"(" ")"} | <function-1> <power> | <function-X> "(" <expr> {"," <expr>} ")" | "(" <list> ")" */
+    // printf("BASE\n");
+    
     te_expr *ret;
     int arity;
 
@@ -314,6 +318,10 @@ static te_expr *base(state *s) {
             ret = new_expr(TE_CONSTANT, 0);
             ret->value = s->value;
             next_token(s);
+            if(s->type == TOK_SUFIX) {
+                ret->value = fac(ret->value);   
+                next_token(s);
+            }
             break;
 
         case TOK_VARIABLE:
@@ -406,7 +414,7 @@ static te_expr *power(state *s) {
         if (s->function == sub) sign = -sign;
         next_token(s);
     }
-
+    // printf("POWER\n");
     te_expr *ret;
 
     if (sign == 1) {
@@ -462,6 +470,7 @@ static te_expr *factor(state *s) {
 #else
 static te_expr *factor(state *s) {
     /* <factor>    =    <power> {"^" <power>} */
+    // printf("FACTOR\n");
     te_expr *ret = power(s);
 
     while (s->type == TOK_INFIX && (s->function == pow)) {
@@ -479,6 +488,7 @@ static te_expr *factor(state *s) {
 
 static te_expr *term(state *s) {
     /* <term>      =    <factor> {("*" | "/" | "%") <factor>} */
+    // printf("TERM\n");
     te_expr *ret = factor(s);
 
     while (s->type == TOK_INFIX && (s->function == mul || s->function == divide || s->function == fmod)) {
@@ -494,6 +504,7 @@ static te_expr *term(state *s) {
 
 static te_expr *expr(state *s) {
     /* <expr>      =    <term> {("+" | "-") <term>} */
+    // printf("EXPR\n");
     te_expr *ret = term(s);
 
     while (s->type == TOK_INFIX && (s->function == add || s->function == sub)) {
@@ -509,6 +520,7 @@ static te_expr *expr(state *s) {
 
 static te_expr *list(state *s) {
     /* <list>      =    <expr> {"," <expr>} */
+    // printf("LIST\n");
     te_expr *ret = expr(s);
 
     while (s->type == TOK_SEP) {
